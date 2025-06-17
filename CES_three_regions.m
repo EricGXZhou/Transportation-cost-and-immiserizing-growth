@@ -1,7 +1,17 @@
+%% NOTE:
+% This script analyzes a three-region general equilibrium model with CES preferences and transportation costs.
+% It solves for equilibrium allocations and utilities as transportation productivity in Mexico varies.
+% The model includes:
+%   - Three regions (A, B, M) with goods and transportation sectors
+%   - CES utility and transportation aggregation
+%   - Endogenous labor allocation and transportation demand
+%   - Parameter sweep over Z_TM (transportation productivity in Mexico)
+%   - Plots utilities for US and Mexico as Z_TM changes
+% The main function (CES) is defined in this file for system solving.
+
 clear
 clc
 
-%% NOTE:
 
 %% Parameters
 % Productivity of good sector
@@ -77,7 +87,7 @@ sigma = 1; % elasticity of substitution for consumption
 mu = 0.5; % home bias parameter for consumption
 chi = 1; % elasticity of substitution for transportation services
 lambda_o = 0.5; % origin bias for transportation services
-lambda_d = 0.5; % destination bias for transportation services
+lambda_d = 0.25; % destination bias for transportation services
 
 t_A = 0.1;
 t_B = 0.1;
@@ -139,7 +149,8 @@ function F = CES(x_log, params)
     % T(18): Demand for M's services in route MB
 
     % Normalize W_M = 1
-    W_US = x(34); % Wage in US
+    W_A = x(34); % Wage in A
+    W_B = x(35); % Wage in B
 
     % Unpack parameters
     Z_A = params.Z_A;
@@ -170,25 +181,25 @@ function F = CES(x_log, params)
     P_MM = params.P_MM;
 
     % Delivered prices
-    P_A = W_US / Z_A;
+    P_A = W_A / Z_A;
     P_AA = P_A;
-    P_B = W_US / Z_B;
+    P_B = W_A / Z_B;
     P_BB = P_B;
     mc_A = struct( ...
-        'AB', d.AB ^ rho1 * tau.A_AB * tilde_tau.A_AB * W_US / Z_TA, ...
-        'BA', d.BA ^ rho1 * tau.A_BA * tilde_tau.A_BA * W_US / Z_TA, ...
-        'AM', d.AM ^ rho1 * tau.A_AM * tilde_tau.A_AM * W_US / Z_TA, ...
-        'MA', d.MA ^ rho1 * tau.A_MA * tilde_tau.A_MA * W_US / Z_TA, ...
-        'BM', d.BM ^ rho1 * tau.A_BM * tilde_tau.A_BM * W_US / Z_TA, ...
-        'MB', d.MB ^ rho1 * tau.A_MB * tilde_tau.A_MB * W_US / Z_TA ...
+        'AB', d.AB ^ rho1 * tau.A_AB * tilde_tau.A_AB * W_A / Z_TA, ...
+        'BA', d.BA ^ rho1 * tau.A_BA * tilde_tau.A_BA * W_A / Z_TA, ...
+        'AM', d.AM ^ rho1 * tau.A_AM * tilde_tau.A_AM * W_A / Z_TA, ...
+        'MA', d.MA ^ rho1 * tau.A_MA * tilde_tau.A_MA * W_A / Z_TA, ...
+        'BM', d.BM ^ rho1 * tau.A_BM * tilde_tau.A_BM * W_A / Z_TA, ...
+        'MB', d.MB ^ rho1 * tau.A_MB * tilde_tau.A_MB * W_A / Z_TA ...
         );
     mc_B = struct( ...
-        'AB', d.AB ^ rho1 * tau.B_AB * tilde_tau.B_AB * W_US / Z_TB, ...
-        'BA', d.BA ^ rho1 * tau.B_BA * tilde_tau.B_BA * W_US / Z_TB, ...
-        'AM', d.AM ^ rho1 * tau.B_AM * tilde_tau.B_AM * W_US / Z_TB, ...
-        'MA', d.MA ^ rho1 * tau.B_MA * tilde_tau.B_MA * W_US / Z_TB, ...
-        'BM', d.BM ^ rho1 * tau.B_BM * tilde_tau.B_BM * W_US / Z_TB, ...
-        'MB', d.MB ^ rho1 * tau.B_MB * tilde_tau.B_MB * W_US / Z_TB ...
+        'AB', d.AB ^ rho1 * tau.B_AB * tilde_tau.B_AB * W_B / Z_TB, ...
+        'BA', d.BA ^ rho1 * tau.B_BA * tilde_tau.B_BA * W_B / Z_TB, ...
+        'AM', d.AM ^ rho1 * tau.B_AM * tilde_tau.B_AM * W_B / Z_TB, ...
+        'MA', d.MA ^ rho1 * tau.B_MA * tilde_tau.B_MA * W_B / Z_TB, ...
+        'BM', d.BM ^ rho1 * tau.B_BM * tilde_tau.B_BM * W_B / Z_TB, ...
+        'MB', d.MB ^ rho1 * tau.B_MB * tilde_tau.B_MB * W_B / Z_TB ...
         );
     P_T = struct( ...
         'AB', (lambda_o * mc_A.AB ^ chi + lambda_d * mc_B.AB ^ chi + (1 - lambda_o - lambda_d) * mc_M.AB ^ chi) ^ (1 / chi), ...
@@ -208,12 +219,12 @@ function F = CES(x_log, params)
 
     % Equations
     % Utility maximization
-    F(1) = (P_AA + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_BA ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_MA ^ (1 - sigma)) * C(1) - W_US * (L(1) + LT(1));
-    F(2) = (P_AA + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_BA ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_MA ^ (1 - sigma)) * C(2) - ((1 - mu) / 2 / mu) * (P_AA / P_BA) ^ sigma * W_US * (L(1) + LT(1));
-    F(3) = (P_AA + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_BA ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_MA ^ (1 - sigma)) * C(3) - ((1 - mu) / 2 / mu) * (P_AA / P_MA) ^ sigma * W_US * (L(1) + LT(1));
-    F(4) = (P_BB + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_AB ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_MB ^ (1 - sigma)) * C(4) - ((1 - mu) / 2 / mu) * (P_BB / P_AB) ^ sigma * W_US * (L(2) + LT(2));
-    F(5) = (P_BB + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_AB ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_MB ^ (1 - sigma)) * C(5) - W_US * (L(2) + LT(2));
-    F(6) = (P_BB + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_AB ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_MB ^ (1 - sigma)) * C(6) - ((1 - mu) / 2 / mu) * (P_BB / P_MB) ^ sigma * W_US * (L(2) + LT(2));
+    F(1) = (P_AA + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_BA ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_MA ^ (1 - sigma)) * C(1) - W_A * (L(1) + LT(1));
+    F(2) = (P_AA + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_BA ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_MA ^ (1 - sigma)) * C(2) - ((1 - mu) / 2 / mu) * (P_AA / P_BA) ^ sigma * W_A * (L(1) + LT(1));
+    F(3) = (P_AA + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_BA ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_AA ^ sigma * P_MA ^ (1 - sigma)) * C(3) - ((1 - mu) / 2 / mu) * (P_AA / P_MA) ^ sigma * W_A * (L(1) + LT(1));
+    F(4) = (P_BB + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_AB ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_MB ^ (1 - sigma)) * C(4) - ((1 - mu) / 2 / mu) * (P_BB / P_AB) ^ sigma * W_B * (L(2) + LT(2));
+    F(5) = (P_BB + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_AB ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_MB ^ (1 - sigma)) * C(5) - W_B * (L(2) + LT(2));
+    F(6) = (P_BB + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_AB ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_BB ^ sigma * P_MB ^ (1 - sigma)) * C(6) - ((1 - mu) / 2 / mu) * (P_BB / P_MB) ^ sigma * W_B * (L(2) + LT(2));
     F(7) = (P_MM + ((1 - mu) / 2 / mu) * P_MM ^ sigma * P_AM ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_MM ^ sigma * P_BM ^ (1 - sigma)) * C(7) - ((1 - mu) / 2 / mu) * (P_MM / P_AM) ^ sigma * W_M * L_M_total;
     F(8) = (P_MM + ((1 - mu) / 2 / mu) * P_MM ^ sigma * P_AM ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_MM ^ sigma * P_BM ^ (1 - sigma)) * C(8) - ((1 - mu) / 2 / mu) * (P_MM / P_BM) ^ sigma * W_M * L_M_total;
     F(9) = (P_MM + ((1 - mu) / 2 / mu) * P_MM ^ sigma * P_AM ^ (1 - sigma) + ((1 - mu) / 2 / mu) * P_MM ^ sigma * P_BM ^ (1 - sigma)) * C(9) - W_M * L_M_total;
@@ -313,7 +324,7 @@ for i = 1:length(Z_TM_range)
           ones(3, 1); % Labor allocations in good sector
           ones(3, 1); % Labor allocations in transportation sector
           ones(18, 1); % Demand for transportation services
-          ones(1, 1)]); % US wage
+          ones(2, 1)]); % A and B's wage
 
 
     % Solve the system of equations
@@ -326,7 +337,7 @@ for i = 1:length(Z_TM_range)
     x_sol = fsolve(@(x) CES(x, params), x0, options);
     x = exp(x_sol);
     % Store the solution
-    solutions{i} = [x(1:34); W_M];
+    solutions{i} = [x(1:35); W_M];
     
     % Calculate utilities
     if sigma == 1
@@ -345,7 +356,7 @@ end
 % Label the solutions
 label = ["C_AA";"C_BA";"C_MA";"C_AB";"C_BB";"C_MB";"C_AM";"C_BM";"C_MM";"L_A";"L_B";"L_M";"L_TA";"L_TB";"L_TM";...
     "T_A_AB";"T_B_AB";"T_M_AB";"T_A_AM";"T_B_AM";"T_M_AM";"T_A_BM";"T_B_BM";"T_M_BM";"T_A_BA";"T_B_BA";"T_M_BA";"T_A_MA";"T_B_MA";"T_M_MA";"T_A_MB";"T_B_MB";"T_M_MB";...
-    "W_US";"W_M"];
+    "W_A";"W_B";"W_M"];
 for i = 1:length(Z_TM_range)
     solutions{i} = [label, solutions{i}];
 end
@@ -353,7 +364,8 @@ end
 
 
 % Extract utilities for each region
-U_US = utilities(:, 1)'; % Utilities in US
+U_A = utilities(:, 1)'; % Utilities in A
+U_B = utilities(:, 2)'; % Utilities in B
 U_M = utilities(:, 3)'; % Utilities in Mexico
 
 
@@ -364,7 +376,7 @@ figure;
 % Plotting the utilities 
 nexttile; % Move to the first tile
 hold on;
-plot(Z_TM_range, U_US, 'b-', 'DisplayName', 'Utility in the US', 'LineWidth', 1.5);
+plot(Z_TM_range, U_A, 'b-', 'DisplayName', 'Utility in the US', 'LineWidth', 1.5);
 plot(Z_TM_range, U_M, 'r-', 'DisplayName', 'Utility in Mexico', 'LineWidth', 1.5);
 
 % Add labels and title
