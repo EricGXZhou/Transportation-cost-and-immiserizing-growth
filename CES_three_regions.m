@@ -262,7 +262,7 @@ function F = CES(x_log, params)
 
     % Labor market clearing
     F(34) = L_US_total - (L(1) + LT(1)) - (L(2) + LT(2));
-    F(35) = L_M_total - (L(3) + LT(3));
+    % F(35) = L_M_total - (L(3) + LT(3));
 
     % Spatial equilibrium
     if sigma == 1
