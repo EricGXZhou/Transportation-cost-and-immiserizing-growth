@@ -1,12 +1,12 @@
 %% NOTE:
 % This script analyzes a three-region general equilibrium model with CES preferences and transportation costs.
-% This version represents a real-world counterfactual scenario with asymmetric parameters for regions A (Texas), B (California), and M (Mexico).
-% The model structure is the same as the baseline, but key parameters are set to reflect real-world differences.
+% This scenario represents a factual world where Mexico cannot provide transportation services between Texas (A) and California (B).
+% The model structure and code are the same as the real-world counterfactual, except for the policy frictions on the AB and BA routes.
 
 clear
 clc
 
-%% Parameters (Real World Counterfactual)
+%% Parameters (No Mexico Transport on AB/BA)
 % Productivity of good sector (Texas, California, Mexico)
 Z_A = 6;    % Texas (higher productivity)
 Z_B = 5.5;  % California (high, but less than Texas)
@@ -15,7 +15,6 @@ Z_M = 2.5;  % Mexico (lower productivity)
 % Productivity of transportation sector (Texas, California, Mexico)
 Z_TA = 6;   % Texas (best infrastructure)
 Z_TB = 5;   % California (good infrastructure)
-% Z_TM = 2.5; % Mexico (lower infrastructure)
 
 % Distance matrix (approximate, normalized by Texas=1)
 d = struct( ...
@@ -58,14 +57,14 @@ tau = struct( ...
     'A_MB', commute('AM', 'AB') ...
 );
 
-% Policy parameters for i in route od (example: NAFTA/USMCA, border frictions)
+% Policy parameters for i in route od (Mexico cannot provide AB/BA transport)
 tilde_tau = struct( ...
     'A_AB', 1, ...
     'B_AB', 1.1, ...
-    'M_AB', 1.2, ...
+    'M_AB', 1e6, ... % prohibit Mexico on AB
     'A_BA', 1, ...
     'B_BA', 1.1, ...
-    'M_BA', 1.2, ...
+    'M_BA', 1e6, ... % prohibit Mexico on BA
     'A_AM', 1, ...
     'M_AM', 1.2, ...
     'B_AM', 1.1, ...
@@ -99,19 +98,14 @@ Z_TM_range = linspace(1,10,100); % Example: Mexico's Z_TM from 1 to 10
 % Results
 solutions = cell(length(Z_TM_range), 1);
 utilities = zeros(length(Z_TM_range), 3); % Columns: U_A, U_B, U_M
-
-% Diagnostic storage
 wages = zeros(length(Z_TM_range), 3); % W_A, W_B, W_M
 labors = zeros(length(Z_TM_range), 3); % L_A, L_B, L_M
 trans_M_AB = zeros(length(Z_TM_range), 1);
-trans_M_AM = zeros(length(Z_TM_range), 1);
-trans_M_BM = zeros(length(Z_TM_range), 1);
+trans_M_MA = zeros(length(Z_TM_range), 1);
+trans_M_MB = zeros(length(Z_TM_range), 1);
 
 %% Solutions
-% The rest of the code (CES function, solution loop, plotting, etc.) should be copied from the baseline file and used here without change.
-% Only the parameter block above is different for the real-world scenario.
 for i = 1:length(Z_TM_range)
-    % Normalization
     W_M = 1;
     P_M = 1 / Z_M;
     mc_M = struct( ...
@@ -124,7 +118,6 @@ for i = 1:length(Z_TM_range)
         );
     P_MM = P_M;
 
-    % Set parameters
     params.Z_A = Z_A;
     params.Z_B = Z_B;
     params.Z_M = Z_M;
@@ -146,39 +139,26 @@ for i = 1:length(Z_TM_range)
     params.t_M = t_M;
     params.L_US_total = L_US_total;
     params.L_M_total = L_M_total;
-
     params.W_M = W_M;
     params.P_M = P_M;
     params.mc_M = mc_M;
     params.P_MM = P_MM;
 
-    % Initial guesses for the variables
-    x0 = log([ones(9, 1); % Consumptions
-          ones(3, 1); % Labor allocations in good sector
-          ones(3, 1); % Labor allocations in transportation sector
-          ones(18, 1); % Demand for transportation services
-          ones(2, 1)]); % A and B's wage
-
-    % Solve the system of equations
+    x0 = log([ones(9, 1); ones(3, 1); ones(3, 1); ones(18, 1); ones(2, 1)]);
     options = optimoptions('fsolve', ...
-    'Display', 'iter', ...
-    'TolFun', 1e-16, ...
-    'TolX', 1e-16, ...
-    'MaxIterations', 1000, ...
-    'MaxFunctionEvaluations', 10000);
+        'Display', 'off', ...
+        'TolFun', 1e-16, ...
+        'TolX', 1e-16, ...
+        'MaxIterations', 1000, ...
+        'MaxFunctionEvaluations', 10000);
     x_sol = fsolve(@(x) CES(x, params), x0, options);
     x = exp(x_sol);
-    % Store the solution
     solutions{i} = [x(1:35); W_M];
-    
-    % Store key diagnostics for debugging
-    wages(i, :) = [x(34), x(35), W_M]; % W_A, W_B, W_M
-    labors(i, :) = [x(10), x(11), x(12)]; % L_A, L_B, L_M
-    trans_M_AB(i) = x(18); % T_M_AB (Mexico transport on AB route)
-    trans_M_MA(i) = x(30); % T_M_MA (Mexico transport on MA route)
-    trans_M_MB(i) = x(33); % T_M_MB (Mexico transport on MB route)
-
-    % Calculate utilities
+    wages(i, :) = [x(34), x(35), W_M];
+    labors(i, :) = [x(10), x(11), x(12)];
+    trans_M_AB(i) = x(18);
+    trans_M_MA(i) = x(30);
+    trans_M_MB(i) = x(33);
     if sigma == 1
         U_A = x(1) ^ mu * x(2) ^ ((1 - mu) / 2) * x(3) ^ ((1 - mu) / 2);
         U_B = x(4) ^ ((1 - mu) / 2) * x(5) ^ mu * x(6) ^ ((1 - mu) / 2);
@@ -188,26 +168,12 @@ for i = 1:length(Z_TM_range)
         U_B = (((1 - mu) / 2) ^ (1 / sigma) * x(4) ^ ((sigma - 1) / sigma) + mu ^ (1 / sigma) * x(5) ^ ((sigma - 1) / sigma) + ((1 - mu) / 2) ^ (1 / sigma) * x(6) ^ ((sigma - 1) / sigma)) ^ (sigma / (sigma - 1));
         U_M = (((1 - mu) / 2) ^ (1 / sigma) * x(7) ^ ((sigma - 1) / sigma) + ((1 - mu) / 2) ^ (1 / sigma) * x(8) ^ ((sigma - 1) / sigma) + mu ^ (1 / sigma) * x(9) ^ ((sigma - 1) / sigma)) ^ (sigma / (sigma - 1));
     end
-
     utilities(i, :) = [U_A, U_B, U_M];
 end
 
-% Label the solutions
-label = ["C_AA";"C_BA";"C_MA";"C_AB";"C_BB";"C_MB";"C_AM";"C_BM";"C_MM";"L_A";"L_B";"L_M";"L_TA";"L_TB";"L_TM";...
-    "T_A_AB";"T_B_AB";"T_M_AB";"T_A_AM";"T_B_AM";"T_M_AM";"T_A_BM";"T_B_BM";"T_M_BM";"T_A_BA";"T_B_BA";"T_M_BA";"T_A_MA";"T_B_MA";"T_M_MA";"T_A_MB";"T_B_MB";"T_M_MB";...
-    "W_A";"W_B";"W_M"];
-for i = 1:length(Z_TM_range)
-    solutions{i} = [label, solutions{i}];
-end
-
-
-
-% Extract utilities for each region
-U_A = utilities(:, 1)'; % Utilities in A
-U_B = utilities(:, 2)'; % Utilities in B
-U_M = utilities(:, 3)'; % Utilities in Mexico
-
-% Extract wages and labor allocations
+U_A = utilities(:, 1)';
+U_B = utilities(:, 2)';
+U_M = utilities(:, 3)';
 W_A = wages(:, 1)';
 W_B = wages(:, 2)';
 W_M = wages(:, 3)';
@@ -218,35 +184,26 @@ T_M_AB = trans_M_AB;
 T_M_MA = trans_M_MA;
 T_M_MB = trans_M_MB;
 
-%% Plotting utiltities and diagnostics
 figure;
 tiledlayout(2,2);
-
-% 1. Utilities
 nexttile;
 hold on;
 plot(Z_TM_range, U_A, 'b-', 'DisplayName', 'Utility in Texas', 'LineWidth', 1.5);
 plot(Z_TM_range, U_B, 'g-', 'DisplayName', 'Utility in California', 'LineWidth', 1.5);
 plot(Z_TM_range, U_M, 'r-', 'DisplayName', 'Utility in Mexico', 'LineWidth', 1.5);
 xlabel('Z_{TM}'); ylabel('Utility'); title('Utilities'); legend; grid on; hold off;
-
-% 2. Wages
 nexttile;
 hold on;
 plot(Z_TM_range, W_A, 'b-', 'DisplayName', 'W_A (Texas)', 'LineWidth', 1.5);
 plot(Z_TM_range, W_B, 'g-', 'DisplayName', 'W_B (California)', 'LineWidth', 1.5);
 plot(Z_TM_range, W_M, 'r-', 'DisplayName', 'W_M (Mexico)', 'LineWidth', 1.5);
 xlabel('Z_{TM}'); ylabel('Wage'); title('Wages'); legend; grid on; hold off;
-
-% 3. Labor allocations
 nexttile;
 hold on;
 plot(Z_TM_range, L_A, 'b-', 'DisplayName', 'L_A (Texas)', 'LineWidth', 1.5);
 plot(Z_TM_range, L_B, 'g-', 'DisplayName', 'L_B (California)', 'LineWidth', 1.5);
 plot(Z_TM_range, L_M, 'r-', 'DisplayName', 'L_M (Mexico)', 'LineWidth', 1.5);
 xlabel('Z_{TM}'); ylabel('Labor in Goods'); title('Labor Allocations'); legend; grid on; hold off;
-
-% 4. Mexico transport flows
 nexttile;
 hold on;
 plot(Z_TM_range, T_M_AB, 'k-', 'DisplayName', 'T_{M,AB}', 'LineWidth', 1.5);
@@ -254,8 +211,5 @@ plot(Z_TM_range, T_M_MA, 'm-', 'DisplayName', 'T_{M,MA}', 'LineWidth', 1.5);
 plot(Z_TM_range, T_M_MB, 'c-', 'DisplayName', 'T_{M,MB}', 'LineWidth', 1.5);
 xlabel('Z_{TM}'); ylabel('Mexico Transport Flows'); title('Mexico Transport Flows'); legend; grid on; hold off;
 
-% Save the figure
-filename = sprintf('sigma_%.1f_mu_%.1f_chi_%.1f_lambda_o_%.1f_lambda_d_%.1f.png', sigma, mu, chi, lambda_o, lambda_d);
-
-% Save the current figure
+filename = sprintf('no_mexico_AB_sigma_%.1f_mu_%.1f_chi_%.1f_lambda_o_%.1f_lambda_d_%.1f.png', sigma, mu, chi, lambda_o, lambda_d);
 %saveas(gcf, filename);
