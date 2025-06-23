@@ -1,36 +1,33 @@
 %% NOTE:
 % This script analyzes a three-region general equilibrium model with CES preferences and transportation costs.
-% It solves for equilibrium allocations and utilities as transportation productivity in Mexico varies.
-% The model includes:
-%   - Three regions (A, B, M) with goods and transportation sectors
-%   - CES utility and transportation aggregation
-%   - Endogenous labor allocation and transportation demand
-%   - Parameter sweep over Z_TM (transportation productivity in Mexico)
-%   - Plots utilities for US and Mexico as Z_TM changes
-% The main function (CES) is defined in this file for system solving.
+% This version represents a real-world counterfactual scenario with asymmetric parameters for regions A (Texas), B (California), and M (Mexico).
+% The model structure is the same as the baseline, but key parameters are set to reflect real-world differences.
 
 clear
 clc
 
+%% Parameters (Real World Counterfactual)
+% Productivity of good sector (Texas, California, Mexico)
+Z_A = 7;    % Texas (higher productivity)
+Z_B = 5.5;  % California (high, but less than Texas)
+Z_M = 2.5;  % Mexico (lower productivity)
 
-%% Parameters
-% Productivity of good sector
-Z_US = 5;
-Z_A = Z_US; 
-Z_B = Z_US; 
-Z_M = 5;
+% Productivity of transportation sector (Texas, California, Mexico)
+Z_TA = 6;   % Texas (best infrastructure)
+Z_TB = 5;   % California (good infrastructure)
+% Z_TM = 2.5; % Mexico (lower infrastructure)
 
-% Productivity of transportation sector
-Z_TUS = 5;
-Z_TA = Z_TUS; 
-Z_TB = Z_TUS;
-
-% Distance matrix (symmetric)
+% Distance matrix (approximate, normalized by Texas=1)
 d = struct( ...
-    'AA', 1, 'BB', 1, 'MM', 1, ...
-    'AB', 1, 'BA', 1, ...
-    'AM', 1, 'MA', 1, ...
-    'BM', 1, 'MB', 1 ...
+    'AA', 1,...    % within Texas
+    'BB', 1,...    % within California
+    'MM', 1, ...   % within Mexico
+    'AB', 2.2, ... % Texas to California (approx. 2200 km)
+    'BA', 2.2, ... % California to Texas
+    'AM', 1.3,...  % Texas to Mexico (approx. 1300 km)
+    'MA', 1.3, ... % Mexico to Texas
+    'BM', 3.0, ... % California to Mexico (approx. 3000 km)
+    'MB', 3.0  ... % Mexico to California
 );
 
 rho1 = 1; % distance exponent
@@ -61,43 +58,43 @@ tau = struct( ...
     'A_MB', commute('AM', 'AB') ...
 );
 
-% policy parameters for i in route od
+% Policy parameters for i in route od (example: NAFTA/USMCA, border frictions)
 tilde_tau = struct( ...
     'A_AB', 1, ...
-    'B_AB', 1, ...
-    'M_AB', 1, ...
+    'B_AB', 1.1, ...
+    'M_AB', 1.2, ...
     'A_BA', 1, ...
-    'B_BA', 1, ...
-    'M_BA', 1, ...
+    'B_BA', 1.1, ...
+    'M_BA', 1.2, ...
     'A_AM', 1, ...
-    'M_AM', 1, ...
-    'B_AM', 1, ...
+    'M_AM', 1.2, ...
+    'B_AM', 1.1, ...
     'A_MA', 1, ...
-    'M_MA', 1, ...
-    'B_MA', 1, ...
-    'B_BM', 1, ...
-    'M_BM', 1, ...
+    'M_MA', 1.2, ...
+    'B_MA', 1.1, ...
+    'B_BM', 1.1, ...
+    'M_BM', 1.2, ...
     'A_BM', 1, ...
-    'B_MB', 1, ...
-    'M_MB', 1, ...
+    'B_MB', 1.1, ...
+    'M_MB', 1.2, ...
     'A_MB', 1 ...
 );
 
-sigma = 1; % elasticity of substitution for consumption
-mu = 0.5; % home bias parameter for consumption
-chi = 1; % elasticity of substitution for transportation services
-lambda_o = 0.5; % origin bias for transportation services
-lambda_d = 0.25; % destination bias for transportation services
+sigma = 1;    % elasticity of substitution for consumption (moderate substitutability)
+mu = 0.6;      % home bias parameter for consumption (some home bias)
+chi = 0.5;     % elasticity of substitution for transportation services (moderate complementarity)
+lambda_o = 0.5; % origin bias for transportation services (neutral)
+lambda_d = 0.2; % destination bias for transportation services (less destination weight)
+% The remaining 0.3 is for the third provider (e.g., Mexico on US-US routes)
 
-t_A = 0.1;
-t_B = 0.1;
-t_M = 0.1;
-L_US_total = 2;
-L_M_total = 1;
+t_A = 0.08;   % Texas (most efficient)
+t_B = 0.12;   % California (moderate)
+t_M = 0.18;   % Mexico (least efficient)
+L_US_total = 6.0;   % US labor
+L_M_total = 4.0;   % Mexico labor
 
-
-% The range of Z_TM
-Z_TM_range = linspace(1,10,100); % Values of Z_TM from 1 to 10
+% The range of Z_TM (Mexico transportation productivity)
+Z_TM_range = linspace(1,10,100); % Example: Mexico's Z_TM from 1 to 10
 
 % Results
 solutions = cell(length(Z_TM_range), 1);
@@ -111,8 +108,8 @@ trans_M_AM = zeros(length(Z_TM_range), 1);
 trans_M_BM = zeros(length(Z_TM_range), 1);
 
 %% Solutions
-% The CES function is now in a separate file: CES.m
-
+% The rest of the code (CES function, solution loop, plotting, etc.) should be copied from the baseline file and used here without change.
+% Only the parameter block above is different for the real-world scenario.
 for i = 1:length(Z_TM_range)
     % Normalization
     W_M = 1;
@@ -167,8 +164,8 @@ for i = 1:length(Z_TM_range)
     'Display', 'iter', ...
     'TolFun', 1e-16, ...
     'TolX', 1e-16, ...
-    'MaxIterations', 10000, ...
-    'MaxFunctionEvaluations', 50000);
+    'MaxIterations', 1000, ...
+    'MaxFunctionEvaluations', 10000);
     x_sol = fsolve(@(x) CES(x, params), x0, options);
     x = exp(x_sol);
     % Store the solution
@@ -178,10 +175,9 @@ for i = 1:length(Z_TM_range)
     wages(i, :) = [x(34), x(35), W_M]; % W_A, W_B, W_M
     labors(i, :) = [x(10), x(11), x(12)]; % L_A, L_B, L_M
     trans_M_AB(i) = x(18); % T_M_AB (Mexico transport on AB route)
-    trans_M_AM(i) = x(21); % T_M_AM (Mexico transport on AM route)
-    trans_M_BM(i) = x(24); % T_M_BM (Mexico transport on BM route)
+    trans_M_MA(i) = x(30); % T_M_MA (Mexico transport on MA route)
+    trans_M_MB(i) = x(33); % T_M_MB (Mexico transport on MB route)
 
-    
     % Calculate utilities
     if sigma == 1
         U_A = x(1) ^ mu * x(2) ^ ((1 - mu) / 2) * x(3) ^ ((1 - mu) / 2);
@@ -219,8 +215,8 @@ L_A = labors(:, 1)';
 L_B = labors(:, 2)';
 L_M = labors(:, 3)';
 T_M_AB = trans_M_AB;
-T_M_AM = trans_M_AM;
-T_M_BM = trans_M_BM;
+T_M_MA = trans_M_MA;
+T_M_MB = trans_M_MB;
 
 %% Plotting utiltities and diagnostics
 figure;
@@ -254,8 +250,8 @@ xlabel('Z_{TM}'); ylabel('Labor in Goods'); title('Labor Allocations'); legend; 
 nexttile;
 hold on;
 plot(Z_TM_range, T_M_AB, 'k-', 'DisplayName', 'T_{M,AB}', 'LineWidth', 1.5);
-plot(Z_TM_range, T_M_AM, 'm-', 'DisplayName', 'T_{M,AM}', 'LineWidth', 1.5);
-plot(Z_TM_range, T_M_BM, 'c-', 'DisplayName', 'T_{M,BM}', 'LineWidth', 1.5);
+plot(Z_TM_range, T_M_MA, 'm-', 'DisplayName', 'T_{M,MA}', 'LineWidth', 1.5);
+plot(Z_TM_range, T_M_MB, 'c-', 'DisplayName', 'T_{M,MB}', 'LineWidth', 1.5);
 xlabel('Z_{TM}'); ylabel('Mexico Transport Flows'); title('Mexico Transport Flows'); legend; grid on; hold off;
 
 % Save the figure
